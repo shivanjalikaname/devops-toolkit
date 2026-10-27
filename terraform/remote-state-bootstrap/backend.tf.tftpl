@@ -1,0 +1,16 @@
+terraform {
+  backend "s3" {
+    bucket  = "${bucket}"
+    key     = "CHANGE-ME/terraform.tfstate"
+    region  = "${region}"
+    encrypt = true
+%{ if kms_key != null ~}
+    kms_key_id = "${kms_key}"
+%{ endif ~}
+%{ if lock_table != null ~}
+    dynamodb_table = "${lock_table}"
+%{ else ~}
+    use_lockfile = true
+%{ endif ~}
+  }
+}

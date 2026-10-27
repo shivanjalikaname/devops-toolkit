@@ -21,6 +21,7 @@ Every tool here is:
 | [ssl_expiry_check.py](python/ssl_expiry_check.py) | Python | Parallel TLS certificate expiry check with warn/crit thresholds and JSON output |
 | [Get-DiskSpaceReport.ps1](powershell/Get-DiskSpaceReport.ps1) | PowerShell | Free-space report for local or remote Windows servers, pipeline-friendly objects and exit codes |
 | [docker-build-push.yml](.github/workflows/docker-build-push.yml) | GitHub Actions | Reusable workflow: multi-arch build, Trivy scan, smart tagging and push to GHCR |
+| [remote-state-bootstrap](terraform/remote-state-bootstrap) | Terraform / AWS | Versioned, encrypted, TLS-only S3 state bucket with optional DynamoDB locking; emits a ready-to-paste backend block |
 
 ## Quick start
 
@@ -54,6 +55,7 @@ bash/                Linux hosts and CI runners
 kubernetes/          Cluster operations helpers
 python/              Cross-platform automation
 powershell/          Windows server automation
+terraform/           Small, reusable Terraform modules
 .github/workflows/   Reusable GitHub Actions workflows
 ```
 
