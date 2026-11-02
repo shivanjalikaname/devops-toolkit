@@ -20,6 +20,7 @@ Every tool here is:
 | [cron-wrap.sh](bash/cron-wrap.sh) | Bash | Wrap any cron job with an overlap lock, timeout, per-job log and webhook alert on failure |
 | [pod-triage.sh](kubernetes/pod-triage.sh) | Kubernetes | One-shot view of crashing, pending and flapping pods with last termination reason and previous logs |
 | [ssl_expiry_check.py](python/ssl_expiry_check.py) | Python | Parallel TLS certificate expiry check with warn/crit thresholds and JSON output |
+| [env_check.py](python/env_check.py) | Python | Validate `.env` against `.env.example`: missing/empty keys, typed values, placeholders, duplicates; never prints values |
 | [Get-DiskSpaceReport.ps1](powershell/Get-DiskSpaceReport.ps1) | PowerShell | Free-space report for local or remote Windows servers, pipeline-friendly objects and exit codes |
 | [docker-build-push.yml](.github/workflows/docker-build-push.yml) | GitHub Actions | Reusable workflow: multi-arch build, Trivy scan, smart tagging and push to GHCR |
 | [remote-state-bootstrap](terraform/remote-state-bootstrap) | Terraform / AWS | Versioned, encrypted, TLS-only S3 state bucket with optional DynamoDB locking; emits a ready-to-paste backend block |
