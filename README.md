@@ -24,6 +24,7 @@ Every tool here is:
 | [Get-DiskSpaceReport.ps1](powershell/Get-DiskSpaceReport.ps1) | PowerShell | Free-space report for local or remote Windows servers, pipeline-friendly objects and exit codes |
 | [docker-build-push.yml](.github/workflows/docker-build-push.yml) | GitHub Actions | Reusable workflow: multi-arch build, Trivy scan, smart tagging and push to GHCR |
 | [remote-state-bootstrap](terraform/remote-state-bootstrap) | Terraform / AWS | Versioned, encrypted, TLS-only S3 state bucket with optional DynamoDB locking; emits a ready-to-paste backend block |
+| [node-alerts.rules.yml](monitoring/prometheus/node-alerts.rules.yml) | Monitoring / Prometheus | node_exporter alert rules: availability, CPU steal, memory/OOM, disk fill prediction, inodes, read-only FS, clock skew, conntrack |
 
 ## Quick start
 
@@ -58,6 +59,7 @@ kubernetes/          Cluster operations helpers
 python/              Cross-platform automation
 powershell/          Windows server automation
 terraform/           Small, reusable Terraform modules
+monitoring/          Prometheus alert rules and monitoring config
 .github/workflows/   Reusable GitHub Actions workflows
 ```
 
