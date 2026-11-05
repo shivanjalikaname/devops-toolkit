@@ -22,6 +22,7 @@ Every tool here is:
 | [ssl_expiry_check.py](python/ssl_expiry_check.py) | Python | Parallel TLS certificate expiry check with warn/crit thresholds and JSON output |
 | [env_check.py](python/env_check.py) | Python | Validate `.env` against `.env.example`: missing/empty keys, typed values, placeholders, duplicates; never prints values |
 | [Get-DiskSpaceReport.ps1](powershell/Get-DiskSpaceReport.ps1) | PowerShell | Free-space report for local or remote Windows servers, pipeline-friendly objects and exit codes |
+| [Invoke-ServiceWatchdog.ps1](powershell/Invoke-ServiceWatchdog.ps1) | PowerShell | Restart stopped Windows services with a stability check, webhook alerts and a circuit breaker that stops chasing crash loops |
 | [docker-build-push.yml](.github/workflows/docker-build-push.yml) | GitHub Actions | Reusable workflow: multi-arch build, Trivy scan, smart tagging and push to GHCR |
 | [remote-state-bootstrap](terraform/remote-state-bootstrap) | Terraform / AWS | Versioned, encrypted, TLS-only S3 state bucket with optional DynamoDB locking; emits a ready-to-paste backend block |
 | [node-alerts.rules.yml](monitoring/prometheus/node-alerts.rules.yml) | Monitoring / Prometheus | node_exporter alert rules: availability, CPU steal, memory/OOM, disk fill prediction, inodes, read-only FS, clock skew, conntrack |
