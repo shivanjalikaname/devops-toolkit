@@ -15,6 +15,7 @@ Every tool here is:
 |------|------|--------------|
 | [http-healthcheck.sh](bash/http-healthcheck.sh) | Bash | Check HTTP endpoints with retries and timeouts; non-zero exit for CI smoke tests and readiness gates |
 | [pg-backup.sh](bash/pg-backup.sh) | Bash / PostgreSQL | Compressed `pg_dump` backups with integrity check, retention and optional S3 upload |
+| [mongo-backup.sh](bash/mongo-backup.sh) | Bash / MongoDB | Streamed `mongodump` encrypted with `age` (host holds only the public key), SHA-256 sidecars, size sanity check, count-based retention and verified off-site copy via rclone |
 | [docker-cleanup.sh](bash/docker-cleanup.sh) | Bash / Docker | Reclaim disk on Docker hosts and CI runners by age, with dry run; volumes untouched unless asked |
 | [log-cleanup.sh](bash/log-cleanup.sh) | Bash | Compress and expire application logs that logrotate doesn't cover; skips files still open |
 | [cron-wrap.sh](bash/cron-wrap.sh) | Bash | Wrap any cron job with an overlap lock, timeout, per-job log and webhook alert on failure |
