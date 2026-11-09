@@ -1,0 +1,17 @@
+# Copy to nodes.yml (or one file per environment, e.g. prod.yml) to scrape
+# node_exporter on other machines. Picked up within a minute, no reload.
+#
+# Only *.yml files are read, so this example is ignored until renamed.
+
+- targets:
+    - web01.example.com:9100
+    - web02.example.com:9100
+  labels:
+    env: production
+    role: web
+
+- targets:
+    - db01.example.com:9100
+  labels:
+    env: production
+    role: database

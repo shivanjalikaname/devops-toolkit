@@ -1,0 +1,56 @@
+# Rules for the monitoring stack itself. If these don't work, nothing else does.
+
+groups:
+  - name: monitoring-stack
+    rules:
+      # Always firing. Route it to a dead man's switch (Healthchecks.io, PagerDuty
+      # heartbeat, ...) so you get paged when alerts STOP arriving.
+      - alert: Watchdog
+        expr: vector(1)
+        labels:
+          severity: none
+        annotations:
+          summary: "Alerting pipeline heartbeat"
+
+      - alert: PrometheusConfigReloadFailed
+        expr: prometheus_config_last_reload_successful == 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Prometheus config reload failed"
+          description: "Prometheus is still running the previous config. Run promtool check config and look at the container logs."
+
+      - alert: PrometheusRuleEvaluationFailing
+        expr: increase(prometheus_rule_evaluation_failures_total[10m]) > 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Rule group {{ $labels.rule_group }} is failing to evaluate"
+
+      - alert: PrometheusNotConnectedToAlertmanager
+        expr: prometheus_notifications_alertmanagers_discovered < 1
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Prometheus cannot reach any Alertmanager"
+          description: "Alerts are being evaluated but not delivered."
+
+      - alert: AlertmanagerNotificationsFailing
+        expr: rate(alertmanager_notifications_failed_total[10m]) > 0
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Alertmanager failing to send to {{ $labels.integration }}"
+          description: "Check the receiver URL/credentials and outbound network access from the alertmanager container."
+
+      - alert: PrometheusTargetDown
+        expr: up{job!="node"} == 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Scrape target {{ $labels.job }}/{{ $labels.instance }} is down"

@@ -1,0 +1,118 @@
+# Single-host monitoring stack: Prometheus + Alertmanager + node_exporter.
+#
+# Loads the repo's alert rules from monitoring/prometheus/ directly, so rule
+# changes are picked up with a reload instead of copying files around.
+#
+# Usage:
+#   cp .env.example .env            # optional, defaults are fine for a first run
+#   docker compose up -d
+#   docker compose ps               # all three should report "healthy"
+#
+#   # after editing prometheus.yml, rules or targets:
+#   docker compose run --rm --entrypoint promtool prometheus check config /etc/prometheus/prometheus.yml
+#   curl -X POST http://127.0.0.1:9090/-/reload
+#
+# UIs bind to 127.0.0.1 by default. Put a reverse proxy with auth in front, or
+# set BIND_ADDR deliberately - neither Prometheus nor Alertmanager ship with auth.
+#
+# node_exporter needs the host's /proc, /sys and / mounted read-only; it only
+# reports the real host when Docker runs natively on Linux (not Docker Desktop).
+
+name: monitoring
+
+x-hardening: &hardening
+  restart: unless-stopped
+  read_only: true
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "3"
+
+services:
+  prometheus:
+    <<: *hardening
+    image: prom/prometheus:${PROMETHEUS_VERSION:-v2.55.1}
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=${PROMETHEUS_RETENTION:-15d}
+      - --storage.tsdb.retention.size=${PROMETHEUS_RETENTION_SIZE:-10GB}
+      - --web.enable-lifecycle
+      - --web.external-url=${PROMETHEUS_EXTERNAL_URL:-http://127.0.0.1:9090}
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus/rules:/etc/prometheus/rules.d/stack:ro
+      - ./prometheus/targets:/etc/prometheus/targets:ro
+      - ../../monitoring/prometheus:/etc/prometheus/rules.d/toolkit:ro
+      - prometheus-data:/prometheus
+    tmpfs:
+      - /tmp
+    ports:
+      - "${BIND_ADDR:-127.0.0.1}:9090:9090"
+    depends_on:
+      alertmanager:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:9090/-/ready"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  alertmanager:
+    <<: *hardening
+    image: prom/alertmanager:${ALERTMANAGER_VERSION:-v0.27.0}
+    command:
+      - --config.file=/etc/alertmanager/alertmanager.yml
+      - --storage.path=/alertmanager
+      - --web.external-url=${ALERTMANAGER_EXTERNAL_URL:-http://127.0.0.1:9093}
+      # single instance: don't try to form a cluster
+      - --cluster.listen-address=
+    volumes:
+      - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - ./alertmanager/secrets:/etc/alertmanager/secrets:ro
+      - alertmanager-data:/alertmanager
+    tmpfs:
+      - /tmp
+    ports:
+      - "${BIND_ADDR:-127.0.0.1}:9093:9093"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:9093/-/ready"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  node-exporter:
+    <<: *hardening
+    image: prom/node-exporter:${NODE_EXPORTER_VERSION:-v1.8.2}
+    command:
+      - --path.procfs=/host/proc
+      - --path.sysfs=/host/sys
+      - --path.rootfs=/host/root
+      - --collector.systemd
+      - --collector.filesystem.mount-points-exclude=^/(dev|proc|sys|run/user|var/lib/docker/.+|var/lib/containerd/.+)($$|/)
+    pid: host
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/host/root:ro,rslave
+      # systemd collector talks to systemd over D-Bus
+      - /run/dbus/system_bus_socket:/var/run/dbus/system_bus_socket:ro
+    # not published: Prometheus scrapes it over the compose network
+    expose:
+      - "9100"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:9100/metrics"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  prometheus-data:
+  alertmanager-data:

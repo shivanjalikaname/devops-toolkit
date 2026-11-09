@@ -1,0 +1,49 @@
+# Ships with every alert going to "blackhole" so the stack starts cleanly with
+# no credentials. To get notifications:
+#
+#   1. Put the webhook URL in alertmanager/secrets/slack_webhook_url (one line,
+#      no quotes). That directory is gitignored.
+#   2. Uncomment the slack receiver below and set route.receiver: slack.
+#   3. docker compose run --rm --entrypoint amtool alertmanager check-config /etc/alertmanager/alertmanager.yml
+#      curl -X POST http://127.0.0.1:9093/-/reload
+
+route:
+  receiver: blackhole
+  group_by: [alertname, instance]
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+  routes:
+    - matchers: [alertname="Watchdog"]
+      receiver: blackhole   # point this at your dead man's switch
+      repeat_interval: 1m
+    - matchers: [severity="critical"]
+      receiver: blackhole
+      repeat_interval: 1h
+
+inhibit_rules:
+  # the critical variant of a rule silences its warning variant
+  - source_matchers: [alertname="NodeFilesystemSpaceCritical"]
+    target_matchers: [alertname=~"NodeFilesystemSpaceLow|NodeFilesystemFillingUp"]
+    equal: [instance, mountpoint]
+  - source_matchers: [alertname="NodeMemoryCritical"]
+    target_matchers: [alertname="NodeMemoryLow"]
+    equal: [instance]
+  # host unreachable: don't also page for everything else on that host
+  - source_matchers: [alertname="NodeExporterDown"]
+    target_matchers: [alertname!="NodeExporterDown"]
+    equal: [instance]
+
+receivers:
+  - name: blackhole
+
+  # - name: slack
+  #   slack_configs:
+  #     - api_url_file: /etc/alertmanager/secrets/slack_webhook_url
+  #       channel: "#alerts"
+  #       send_resolved: true
+  #       title: '[{{ .Status | toUpper }}{{ if eq .Status "firing" }}:{{ .Alerts.Firing | len }}{{ end }}] {{ .CommonLabels.alertname }}'
+  #       text: >-
+  #         {{ range .Alerts }}*{{ .Labels.instance }}* - {{ .Annotations.summary }}
+  #         {{ if .Annotations.description }}{{ .Annotations.description }}{{ end }}
+  #         {{ end }}

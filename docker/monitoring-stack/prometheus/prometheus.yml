@@ -1,0 +1,45 @@
+global:
+  scrape_interval: 30s
+  scrape_timeout: 10s
+  evaluation_interval: 30s
+  external_labels:
+    # shows up on every alert; set it to something that tells you which stack fired
+    monitor: example-monitoring
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ["alertmanager:9093"]
+
+rule_files:
+  - /etc/prometheus/rules.d/stack/*.yml
+  - /etc/prometheus/rules.d/toolkit/*.rules.yml
+
+scrape_configs:
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  - job_name: alertmanager
+    static_configs:
+      - targets: ["alertmanager:9093"]
+
+  # job="node" is what monitoring/prometheus/node-alerts.rules.yml expects.
+  - job_name: node
+    static_configs:
+      - targets: ["node-exporter:9100"]
+    # Remote hosts: drop a YAML file into targets/ (see nodes.yml.example).
+    # Prometheus re-reads the directory on its own, no reload needed.
+    file_sd_configs:
+      - files: ["/etc/prometheus/targets/*.yml"]
+        refresh_interval: 1m
+    relabel_configs:
+      # instance="web01.example.com" instead of "web01.example.com:9100"
+      - source_labels: [__address__]
+        regex: '(.+):\d+'
+        target_label: instance
+      # the local exporter's address is a compose service name; give it a real one
+      - source_labels: [__address__]
+        regex: "node-exporter:9100"
+        target_label: instance
+        replacement: monitoring-host

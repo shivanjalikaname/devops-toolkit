@@ -1,0 +1,4 @@
+.env
+alertmanager/secrets/*
+!alertmanager/secrets/.gitkeep
+prometheus/targets/*.yml
