@@ -21,6 +21,7 @@ Every tool here is:
 | [cron-wrap.sh](bash/cron-wrap.sh) | Bash | Wrap any cron job with an overlap lock, timeout, per-job log and webhook alert on failure |
 | [git-branch-cleanup.sh](bash/git-branch-cleanup.sh) | Bash / Git | Report and prune merged branches locally or on a remote, including squash merges; protected patterns, stale-branch report, dry run by default |
 | [pod-triage.sh](kubernetes/pod-triage.sh) | Kubernetes | One-shot view of crashing, pending and flapping pods with last termination reason and previous logs |
+| [k8s_resource_audit.py](python/k8s_resource_audit.py) | Python / Kubernetes | Audit CPU/memory requests and limits on workload templates: missing requests, no memory limit, inverted or oversized limits; LimitRange-aware, JSON output |
 | [ssl_expiry_check.py](python/ssl_expiry_check.py) | Python | Parallel TLS certificate expiry check with warn/crit thresholds and JSON output |
 | [env_check.py](python/env_check.py) | Python | Validate `.env` against `.env.example`: missing/empty keys, typed values, placeholders, duplicates; never prints values |
 | [Get-DiskSpaceReport.ps1](powershell/Get-DiskSpaceReport.ps1) | PowerShell | Free-space report for local or remote Windows servers, pipeline-friendly objects and exit codes |
