@@ -1,0 +1,111 @@
+---
+- name: Validate input
+  ansible.builtin.import_tasks: validate.yml
+  tags: [ssh_users, ssh_users_validate]
+
+# Taken before any change. Used to skip key/home tasks for users that only
+# exist "on paper" during --check, and to find home directories.
+- name: Read local accounts
+  ansible.builtin.getent:
+    database: passwd
+  tags: [ssh_users, ssh_users_keys, ssh_users_offboard]
+
+- name: Ensure managed group exists
+  ansible.builtin.group:
+    name: "{{ ssh_users_group }}"
+    state: present
+  tags: [ssh_users]
+
+- name: Ensure users exist
+  ansible.builtin.user:
+    name: "{{ item.name }}"
+    comment: "{{ item.comment | default(omit) }}"
+    uid: "{{ item.uid | default(omit) }}"
+    shell: "{{ item.shell | default(ssh_users_default_shell) }}"
+    groups: "{{ [ssh_users_group] + (item.groups | default([])) }}"
+    append: true
+    create_home: true
+    # Clears the expiry set by ssh_users_locked, so moving someone back to
+    # ssh_users_present re-enables them. Passwords are deliberately left alone:
+    # unlocking a password-less account with usermod -U fails.
+    expires: -1
+    state: present
+  loop: "{{ ssh_users_present }}"
+  loop_control:
+    label: "{{ item.name }}"
+  tags: [ssh_users]
+
+- name: Manage authorized keys
+  ansible.posix.authorized_key:
+    user: "{{ item.name }}"
+    key: "{{ item.authorized_keys | join('\n') }}"
+    exclusive: "{{ item.exclusive_keys | default(ssh_users_exclusive_keys) }}"
+    manage_dir: true
+    state: present
+  loop: "{{ ssh_users_present | selectattr('authorized_keys', 'defined') | selectattr('authorized_keys') | list }}"
+  loop_control:
+    label: "{{ item.name }} ({{ item.authorized_keys | length }} keys)"
+  when: not ansible_check_mode or item.name in ansible_facts.getent_passwd
+  tags: [ssh_users, ssh_users_keys]
+
+# authorized_key cannot express "no keys at all", so exclusive users with an
+# empty list get the file removed outright.
+- name: Remove authorized_keys for users with no keys listed
+  ansible.builtin.file:
+    path: "{{ ansible_facts.getent_passwd[item.name][4] }}/.ssh/authorized_keys"
+    state: absent
+  loop: "{{ ssh_users_present | rejectattr('authorized_keys', 'defined') | list + (ssh_users_present | selectattr('authorized_keys', 'defined') | rejectattr('authorized_keys') | list) }}"
+  loop_control:
+    label: "{{ item.name }}"
+  when:
+    - item.exclusive_keys | default(ssh_users_exclusive_keys) | bool
+    - item.name in ansible_facts.getent_passwd
+  tags: [ssh_users, ssh_users_keys]
+
+- name: Install sudoers drop-ins
+  ansible.builtin.template:
+    src: sudoers.j2
+    dest: "{{ ssh_users_sudoers_dir }}/{{ ssh_users_sudoers_prefix }}{{ item.name | replace('.', '_') }}"
+    owner: root
+    group: root
+    mode: "0440"
+    validate: visudo -cf %s
+  loop: "{{ ssh_users_present | selectattr('sudo', 'defined') | rejectattr('sudo', 'equalto', 'none') | list }}"
+  loop_control:
+    label: "{{ item.name }} ({{ item.sudo }})"
+  tags: [ssh_users, ssh_users_sudo]
+
+# sudo silently ignores files in sudoers.d whose names contain a dot, hence
+# the replace() above and below.
+- name: Remove sudoers drop-ins no longer wanted
+  ansible.builtin.file:
+    path: "{{ ssh_users_sudoers_dir }}/{{ ssh_users_sudoers_prefix }}{{ item | replace('.', '_') }}"
+    state: absent
+  loop: >-
+    {{ (ssh_users_present | rejectattr('sudo', 'defined') | map(attribute='name') | list)
+       + (ssh_users_present | selectattr('sudo', 'defined') | selectattr('sudo', 'equalto', 'none') | map(attribute='name') | list)
+       + ssh_users_absent + ssh_users_locked }}
+  tags: [ssh_users, ssh_users_sudo]
+
+- name: Lock offboarded users
+  ansible.builtin.user:
+    name: "{{ item }}"
+    password_lock: true
+    expires: 1
+  loop: "{{ ssh_users_locked }}"
+  when: item in ansible_facts.getent_passwd
+  tags: [ssh_users, ssh_users_offboard]
+
+- name: Remove users
+  ansible.builtin.user:
+    name: "{{ item }}"
+    state: absent
+    remove: "{{ ssh_users_remove_home }}"
+    force: "{{ ssh_users_force_remove }}"
+  loop: "{{ ssh_users_absent }}"
+  tags: [ssh_users, ssh_users_offboard]
+
+- name: Report drift
+  ansible.builtin.import_tasks: drift.yml
+  when: ssh_users_report_drift | bool
+  tags: [ssh_users, ssh_users_drift]

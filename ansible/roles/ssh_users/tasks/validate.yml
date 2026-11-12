@@ -1,0 +1,65 @@
+---
+# Fail fast on the controller before touching any host. A typo in a key or a
+# username is far cheaper to catch here than halfway through a fleet.
+
+- name: Check usernames and sudo modes
+  ansible.builtin.assert:
+    that:
+      - item.name is defined
+      - item.name is match('^[a-z_][a-z0-9_.-]{0,31}$')
+      - item.sudo | default('none') in ['none', 'password', 'nopasswd']
+      - item.authorized_keys | default([]) is not string
+      - item.groups | default([]) is not string
+    fail_msg: >-
+      Invalid entry {{ item.name | default('<no name>') }}: name must be a POSIX
+      username, sudo one of none/password/nopasswd, authorized_keys and groups lists.
+    quiet: true
+  loop: "{{ ssh_users_present }}"
+  loop_control:
+    label: "{{ item.name | default('<no name>') }}"
+  run_once: true
+
+- name: Check SSH keys
+  ansible.builtin.assert:
+    that:
+      - item.1 is match('^\S+ [A-Za-z0-9+/]+={0,3}( .*)?$')
+      - item.1.split()[0] in ssh_users_allowed_key_types
+    fail_msg: >-
+      Rejected key #{{ ansible_loop.index }} for {{ item.0.name }}: type
+      '{{ item.1.split()[0] | default('') }}' not in ssh_users_allowed_key_types,
+      or the key is malformed (options like from="..." are not supported here).
+    quiet: true
+  loop: "{{ ssh_users_present | subelements('authorized_keys', skip_missing=true) }}"
+  loop_control:
+    label: "{{ item.0.name }}"
+    extended: true
+  run_once: true
+
+- name: Check lists do not conflict
+  vars:
+    _present: "{{ ssh_users_present | map(attribute='name') | list }}"
+  ansible.builtin.assert:
+    that:
+      - _present | length == _present | unique | length
+      - _present | intersect(ssh_users_absent) | length == 0
+      - _present | intersect(ssh_users_locked) | length == 0
+      - ssh_users_absent | intersect(ssh_users_locked) | length == 0
+    fail_msg: >-
+      A user is listed twice or in more than one of ssh_users_present /
+      ssh_users_absent / ssh_users_locked.
+    quiet: true
+  run_once: true
+
+# The classic way to brick a fleet: offboard the account Ansible itself logs
+# in with. Checked per host because ansible_user can differ between groups.
+- name: Refuse to remove or lock the connection user
+  vars:
+    _conn_user: "{{ ansible_user | default(lookup('env', 'USER')) }}"
+  ansible.builtin.assert:
+    that:
+      - _conn_user not in ssh_users_absent
+      - _conn_user not in ssh_users_locked
+    fail_msg: >-
+      Refusing to offboard '{{ _conn_user }}', the account this play connects
+      as. Run from a different account first.
+    quiet: true

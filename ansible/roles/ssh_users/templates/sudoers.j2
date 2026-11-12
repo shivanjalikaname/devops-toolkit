@@ -1,0 +1,7 @@
+# {{ ansible_managed }}
+# Managed by the ssh_users role; local edits will be overwritten.
+{% if item.sudo == 'nopasswd' %}
+{{ item.name }} ALL=(ALL:ALL) NOPASSWD: ALL
+{% else %}
+{{ item.name }} ALL=(ALL:ALL) ALL
+{% endif %}

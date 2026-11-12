@@ -1,0 +1,16 @@
+---
+galaxy_info:
+  role_name: ssh_users
+  author: shivanjalikaname
+  description: Manage local admin users, SSH authorized keys, sudo drop-ins and offboarding
+  license: MIT
+  min_ansible_version: "2.14"
+  platforms:
+    - name: Ubuntu
+      versions: [jammy, noble]
+    - name: Debian
+      versions: [bookworm]
+    - name: EL
+      versions: ["8", "9"]
+
+dependencies: []

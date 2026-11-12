@@ -1,0 +1,20 @@
+---
+# Apply SSH user management to a fleet.
+#
+#   ansible-galaxy collection install -r ansible/requirements.yml
+#   ansible-playbook -i inventory ansible/users.yml --check --diff     # preview
+#   ansible-playbook -i inventory ansible/users.yml --limit web
+#   ansible-playbook -i inventory ansible/users.yml --tags ssh_users_keys
+#
+# Define ssh_users_present / ssh_users_absent / ssh_users_locked in
+# group_vars (see roles/ssh_users/README.md for the schema).
+
+- name: Manage SSH users
+  hosts: all
+  become: true
+  # Roll out in batches so a bad key list cannot lock you out of every host
+  # at once; the play stops if a whole batch fails.
+  serial: "{{ ssh_users_serial | default('25%') }}"
+  max_fail_percentage: 0
+  roles:
+    - ssh_users

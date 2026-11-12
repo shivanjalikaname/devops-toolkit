@@ -1,0 +1,59 @@
+---
+# Users that should exist with SSH access. Each entry:
+#
+#   - name: jdoe                  # required, POSIX username
+#     comment: "Jane Doe"         # GECOS field
+#     uid: 2001                   # optional; pin it if you share NFS homes
+#     shell: /bin/bash
+#     groups: [docker]            # extra groups, appended (existing ones kept)
+#     sudo: nopasswd              # none | password | nopasswd
+#     exclusive_keys: true        # override ssh_users_exclusive_keys per user
+#     authorized_keys:
+#       - ssh-ed25519 AAAAC3Nz... jdoe@laptop
+#
+# Note the field is authorized_keys, not "keys": item.keys is a dict method in
+# Jinja and silently resolves to the wrong thing.
+ssh_users_present: []
+
+# Usernames to remove. Their sudoers drop-in is removed too.
+ssh_users_absent: []
+
+# Usernames to lock without deleting (offboarding while files are reviewed).
+# Password is locked and the account expired, which makes sshd refuse key
+# logins as well when UsePAM is on (the default on every major distro).
+# Moving a user back to ssh_users_present clears the expiry; the password
+# stays locked, which does not affect key logins.
+ssh_users_locked: []
+
+# Every managed user is added to this group. Pair it with "AllowGroups" in
+# sshd_config if you want SSH limited to managed accounts.
+ssh_users_group: sshusers
+
+ssh_users_default_shell: /bin/bash
+
+# true replaces authorized_keys with exactly what is listed, so a key removed
+# from inventory is removed from the host. Set false only while migrating.
+ssh_users_exclusive_keys: true
+
+ssh_users_allowed_key_types:
+  - ssh-ed25519
+  - sk-ssh-ed25519@openssh.com
+  - ecdsa-sha2-nistp256
+  - ecdsa-sha2-nistp384
+  - ecdsa-sha2-nistp521
+  - sk-ecdsa-sha2-nistp256@openssh.com
+  - ssh-rsa
+
+# Deleting home directories is irreversible; off unless asked for.
+ssh_users_remove_home: false
+
+# userdel refuses to remove a user with running processes. force kills that
+# safety net, so it stays off by default.
+ssh_users_force_remove: false
+
+ssh_users_sudoers_dir: /etc/sudoers.d
+ssh_users_sudoers_prefix: 90-ansible-
+
+# Report members of ssh_users_group that are not in ssh_users_present.
+# Hand-added accounts are reported, never removed.
+ssh_users_report_drift: true

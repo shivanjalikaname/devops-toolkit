@@ -1,0 +1,19 @@
+---
+- name: Read managed group membership
+  ansible.builtin.getent:
+    database: group
+    key: "{{ ssh_users_group }}"
+    fail_key: false
+
+# getent_group[name] is [password, gid, "member1,member2"]
+- name: Warn about unmanaged members of the group
+  vars:
+    _row: "{{ ansible_facts.getent_group[ssh_users_group] | default(none) }}"
+    _members: "{{ (_row[2] | default('', true)).split(',') | select | list if _row else [] }}"
+    _unmanaged: "{{ _members | difference(ssh_users_present | map(attribute='name')) }}"
+  ansible.builtin.debug:
+    msg: >-
+      {{ _unmanaged | length }} member(s) of {{ ssh_users_group }} not in
+      ssh_users_present: {{ _unmanaged | join(', ') }}. Add them to inventory,
+      or to ssh_users_absent / ssh_users_locked.
+  when: _unmanaged | length > 0
