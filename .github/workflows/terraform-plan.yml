@@ -1,0 +1,257 @@
+# Reusable GitHub Actions workflow: run terraform fmt/validate/plan on a pull request
+# and keep a single, updated plan comment on the PR.
+#
+# Call it from another workflow:
+#
+#   on:
+#     pull_request:
+#       paths: ['infra/prod/**']
+#
+#   permissions:
+#     contents: read
+#     pull-requests: write
+#     id-token: write          # only needed with aws-role-arn
+#
+#   jobs:
+#     plan:
+#       uses: shivanjalikaname/devops-toolkit/.github/workflows/terraform-plan.yml@main
+#       with:
+#         working-directory: infra/prod
+#         aws-role-arn: arn:aws:iam::123456789012:role/gha-terraform-plan
+#         var-file: prod.tfvars
+#
+# One comment per working directory: re-runs edit the existing comment instead of
+# piling up new ones, so several stacks can plan on the same PR.
+#
+# Plans that destroy or replace resources are called out at the top of the comment.
+# Set fail-on-destroy: true to turn that into a failed check (useful on prod stacks
+# where a destroy should always get a second pair of eyes).
+#
+# The binary plan is uploaded as an artifact for reference only. Apply from a fresh
+# plan on the default branch; a plan file from a PR goes stale the moment main moves.
+
+name: terraform-plan
+
+on:
+  workflow_call:
+    inputs:
+      working-directory:
+        description: Directory containing the root module
+        required: true
+        type: string
+      terraform-version:
+        description: Terraform version to install (exact version or constraint)
+        required: false
+        type: string
+        default: '~1.9'
+      var-file:
+        description: Optional tfvars file, relative to working-directory
+        required: false
+        type: string
+        default: ''
+      backend-config:
+        description: Optional backend config file passed to init, relative to working-directory
+        required: false
+        type: string
+        default: ''
+      aws-role-arn:
+        description: IAM role to assume through GitHub OIDC; leave empty to skip AWS auth
+        required: false
+        type: string
+        default: ''
+      aws-region:
+        description: AWS region for the OIDC session
+        required: false
+        type: string
+        default: us-east-1
+      fail-on-destroy:
+        description: Fail the check when the plan deletes or replaces resources
+        required: false
+        type: boolean
+        default: false
+    outputs:
+      has-changes:
+        description: "'true' when the plan contains changes"
+        value: ${{ jobs.plan.outputs.has-changes }}
+      destroy-count:
+        description: Number of resources the plan deletes or replaces
+        value: ${{ jobs.plan.outputs.destroy-count }}
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    concurrency:
+      group: tf-plan-${{ github.event.pull_request.number || github.ref }}-${{ inputs.working-directory }}
+      cancel-in-progress: true
+    defaults:
+      run:
+        working-directory: ${{ inputs.working-directory }}
+    outputs:
+      has-changes: ${{ steps.plan.outputs.has-changes }}
+      destroy-count: ${{ steps.summary.outputs.destroy-count }}
+    env:
+      TF_IN_AUTOMATION: 'true'
+      TF_INPUT: 'false'
+      VAR_FILE: ${{ inputs.var-file }}
+      BACKEND_CONFIG: ${{ inputs.backend-config }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ inputs.terraform-version }}
+          # The wrapper mangles stdout and exit codes; we capture both ourselves
+          terraform_wrapper: false
+
+      - name: Configure AWS credentials
+        if: inputs.aws-role-arn != ''
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ inputs.aws-role-arn }}
+          aws-region: ${{ inputs.aws-region }}
+          role-session-name: tf-plan-${{ github.run_id }}
+
+      - name: Format check
+        id: fmt
+        continue-on-error: true
+        run: terraform fmt -check -recursive -diff -no-color
+
+      - name: Init
+        run: |
+          args=(-no-color -lockfile=readonly)
+          [[ -n "$BACKEND_CONFIG" ]] && args+=("-backend-config=$BACKEND_CONFIG")
+          terraform init "${args[@]}"
+
+      - name: Validate
+        run: terraform validate -no-color
+
+      - name: Plan
+        id: plan
+        run: |
+          args=(-no-color -detailed-exitcode -lock-timeout=120s -out=tfplan)
+          [[ -n "$VAR_FILE" ]] && args+=("-var-file=$VAR_FILE")
+
+          set +e
+          terraform plan "${args[@]}" 2>&1 | tee plan.log
+          rc=${PIPESTATUS[0]}
+          set -e
+
+          # -detailed-exitcode: 0 = no changes, 1 = error, 2 = changes present
+          case $rc in
+            0) echo "has-changes=false" >> "$GITHUB_OUTPUT" ;;
+            2) echo "has-changes=true"  >> "$GITHUB_OUTPUT" ;;
+            *) echo "has-changes=false" >> "$GITHUB_OUTPUT"
+               echo "::error::terraform plan failed with exit code $rc"
+               exit 1 ;;
+          esac
+
+      - name: Summarise plan
+        id: summary
+        if: steps.plan.outcome == 'success'
+        run: |
+          terraform show -no-color tfplan > plan.txt
+          terraform show -json tfplan > plan.json
+
+          # A replace shows up as ["delete","create"] or ["create","delete"]
+          jq -r '
+            .resource_changes[]?
+            | select(any(.change.actions[]; . == "delete"))
+            | .address' plan.json > destroyed.txt
+
+          count=$(wc -l < destroyed.txt | tr -d ' ')
+          echo "destroy-count=$count" >> "$GITHUB_OUTPUT"
+          grep -E '^(Plan:|No changes\.)' plan.txt | tail -n1 > headline.txt || echo "Plan complete." > headline.txt
+
+          # Artifact names cannot contain slashes
+          echo "artifact=tfplan-${PR_OR_RUN}-${WORKDIR//\//-}" >> "$GITHUB_OUTPUT"
+        env:
+          PR_OR_RUN: ${{ github.event.pull_request.number || github.run_id }}
+          WORKDIR: ${{ inputs.working-directory }}
+
+      - name: Upload plan
+        if: steps.plan.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.summary.outputs.artifact }}
+          overwrite: true
+          path: |
+            ${{ inputs.working-directory }}/tfplan
+            ${{ inputs.working-directory }}/plan.txt
+          retention-days: 7
+
+      - name: Comment on PR
+        if: always() && github.event_name == 'pull_request' && steps.plan.outcome != 'skipped'
+        uses: actions/github-script@v7
+        env:
+          WORKDIR: ${{ inputs.working-directory }}
+          FMT_OUTCOME: ${{ steps.fmt.outcome }}
+          PLAN_OUTCOME: ${{ steps.plan.outcome }}
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+            const dir = process.env.WORKDIR;
+            const read = (f) => {
+              try { return fs.readFileSync(path.join(dir, f), 'utf8').trim(); } catch { return ''; }
+            };
+
+            // GitHub rejects comment bodies over 65536 chars; leave room for the wrapper
+            const MAX = 60000;
+            const clip = (s) => s.length > MAX
+              ? s.slice(0, MAX) + '\n\n... truncated, full plan in the workflow artifact ...'
+              : s;
+
+            const marker = `<!-- tf-plan:${dir} -->`;
+            const ok = process.env.PLAN_OUTCOME === 'success';
+            const destroyed = read('destroyed.txt').split('\n').filter(Boolean);
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+
+            const lines = [marker, `### Terraform plan: \`${dir}\``, ''];
+            if (!ok) {
+              lines.push('**Plan failed.**', '', '<details open><summary>Output</summary>', '',
+                         '```', clip(read('plan.log') || 'No output captured, see the run log.'), '```', '</details>');
+            } else {
+              lines.push(`**${read('headline.txt')}**`, '');
+              if (destroyed.length) {
+                lines.push(`> [!WARNING]`, `> ${destroyed.length} resource(s) will be destroyed or replaced:`);
+                destroyed.slice(0, 50).forEach((a) => lines.push(`> - \`${a}\``));
+                if (destroyed.length > 50) lines.push(`> - ...and ${destroyed.length - 50} more`);
+                lines.push('');
+              }
+              lines.push('<details><summary>Show plan</summary>', '', '```hcl', clip(read('plan.txt')), '```', '</details>');
+            }
+            if (process.env.FMT_OUTCOME === 'failure') {
+              lines.push('', '`terraform fmt -check` failed. Run `terraform fmt -recursive` and push.');
+            }
+            lines.push('', `<sub>Commit ${context.sha.slice(0, 7)} · [run](${runUrl})</sub>`);
+            const body = lines.join('\n');
+
+            const issue_number = context.payload.pull_request.number;
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              ...context.repo, issue_number, per_page: 100,
+            });
+            const existing = comments.find((c) => c.user.type === 'Bot' && c.body.startsWith(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({ ...context.repo, comment_id: existing.id, body });
+            } else {
+              await github.rest.issues.createComment({ ...context.repo, issue_number, body });
+            }
+
+      - name: Enforce checks
+        if: always() && steps.plan.outcome == 'success'
+        env:
+          FMT_OUTCOME: ${{ steps.fmt.outcome }}
+          DESTROY_COUNT: ${{ steps.summary.outputs.destroy-count }}
+          FAIL_ON_DESTROY: ${{ inputs.fail-on-destroy }}
+        run: |
+          rc=0
+          if [[ "$FMT_OUTCOME" == "failure" ]]; then
+            echo "::error::terraform fmt check failed"
+            rc=1
+          fi
+          if [[ "$FAIL_ON_DESTROY" == "true" && "${DESTROY_COUNT:-0}" -gt 0 ]]; then
+            echo "::error::plan destroys or replaces $DESTROY_COUNT resource(s) and fail-on-destroy is set"
+            rc=1
+          fi
+          exit $rc
