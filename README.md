@@ -27,6 +27,7 @@ Every tool here is:
 | [Get-DiskSpaceReport.ps1](powershell/Get-DiskSpaceReport.ps1) | PowerShell | Free-space report for local or remote Windows servers, pipeline-friendly objects and exit codes |
 | [Invoke-ServiceWatchdog.ps1](powershell/Invoke-ServiceWatchdog.ps1) | PowerShell | Restart stopped Windows services with a stability check, webhook alerts and a circuit breaker that stops chasing crash loops |
 | [docker-build-push.yml](.github/workflows/docker-build-push.yml) | GitHub Actions | Reusable workflow: multi-arch build, Trivy scan, smart tagging and push to GHCR |
+| [terraform-plan.yml](.github/workflows/terraform-plan.yml) | GitHub Actions / Terraform | Reusable workflow: fmt, validate and plan on PRs with one sticky comment per stack, destroy/replace callout, optional AWS OIDC and fail-on-destroy gate |
 | [ssh_users](ansible/roles/ssh_users) | Ansible | Manage admin users from inventory: exclusive authorized_keys, visudo-validated sudo drop-ins, lock or remove leavers, drift report; refuses to offboard its own connection user |
 | [remote-state-bootstrap](terraform/remote-state-bootstrap) | Terraform / AWS | Versioned, encrypted, TLS-only S3 state bucket with optional DynamoDB locking; emits a ready-to-paste backend block |
 | [node-alerts.rules.yml](monitoring/prometheus/node-alerts.rules.yml) | Monitoring / Prometheus | node_exporter alert rules: availability, CPU steal, memory/OOM, disk fill prediction, inodes, read-only FS, clock skew, conntrack |
