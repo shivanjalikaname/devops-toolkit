@@ -20,6 +20,7 @@ Every tool here is:
 | [log-cleanup.sh](bash/log-cleanup.sh) | Bash | Compress and expire application logs that logrotate doesn't cover; skips files still open |
 | [cron-wrap.sh](bash/cron-wrap.sh) | Bash | Wrap any cron job with an overlap lock, timeout, per-job log and webhook alert on failure |
 | [git-branch-cleanup.sh](bash/git-branch-cleanup.sh) | Bash / Git | Report and prune merged branches locally or on a remote, including squash merges; protected patterns, stale-branch report, dry run by default |
+| [semver-bump.sh](bash/semver-bump.sh) | Bash / Git | Next semantic version from Conventional Commits since the last tag, grouped changelog, pre-release counters (`-rc.N`), prefixed monorepo tags; optional annotated tag and push |
 | [pod-triage.sh](kubernetes/pod-triage.sh) | Kubernetes | One-shot view of crashing, pending and flapping pods with last termination reason and previous logs |
 | [k8s_resource_audit.py](python/k8s_resource_audit.py) | Python / Kubernetes | Audit CPU/memory requests and limits on workload templates: missing requests, no memory limit, inverted or oversized limits; LimitRange-aware, JSON output |
 | [ssl_expiry_check.py](python/ssl_expiry_check.py) | Python | Parallel TLS certificate expiry check with warn/crit thresholds and JSON output |
