@@ -22,6 +22,7 @@ Every tool here is:
 | [git-branch-cleanup.sh](bash/git-branch-cleanup.sh) | Bash / Git | Report and prune merged branches locally or on a remote, including squash merges; protected patterns, stale-branch report, dry run by default |
 | [semver-bump.sh](bash/semver-bump.sh) | Bash / Git | Next semantic version from Conventional Commits since the last tag, grouped changelog, pre-release counters (`-rc.N`), prefixed monorepo tags; optional annotated tag and push |
 | [pod-triage.sh](kubernetes/pod-triage.sh) | Kubernetes | One-shot view of crashing, pending and flapping pods with last termination reason and previous logs |
+| [kube-switch.sh](kubernetes/kube-switch.sh) | Kubernetes | Switch context/namespace by unique substring, jump back with `-`, verify the namespace exists, prod banner with typed confirmation; per-shell mode via a minified kubeconfig |
 | [k8s_resource_audit.py](python/k8s_resource_audit.py) | Python / Kubernetes | Audit CPU/memory requests and limits on workload templates: missing requests, no memory limit, inverted or oversized limits; LimitRange-aware, JSON output |
 | [ssl_expiry_check.py](python/ssl_expiry_check.py) | Python | Parallel TLS certificate expiry check with warn/crit thresholds and JSON output |
 | [aws_orphan_finder.py](python/aws_orphan_finder.py) | Python / AWS | Multi-region report of unattached EBS volumes, idle Elastic IPs and orphaned snapshots with a monthly cost estimate; read-only, keep-tag aware, can emit a reviewable cleanup script |
