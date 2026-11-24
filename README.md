@@ -26,6 +26,7 @@ Every tool here is:
 | [k8s_resource_audit.py](python/k8s_resource_audit.py) | Python / Kubernetes | Audit CPU/memory requests and limits on workload templates: missing requests, no memory limit, inverted or oversized limits; LimitRange-aware, JSON output |
 | [ssl_expiry_check.py](python/ssl_expiry_check.py) | Python | Parallel TLS certificate expiry check with warn/crit thresholds and JSON output |
 | [aws_orphan_finder.py](python/aws_orphan_finder.py) | Python / AWS | Multi-region report of unattached EBS volumes, idle Elastic IPs and orphaned snapshots with a monthly cost estimate; read-only, keep-tag aware, can emit a reviewable cleanup script |
+| [port_check.py](python/port_check.py) | Python | TCP reachability matrix for firewall/security group changes: assert ports open or `/closed`, classifies dns/refused/timeout, tests every resolved address, latency warning, JSON output |
 | [env_check.py](python/env_check.py) | Python | Validate `.env` against `.env.example`: missing/empty keys, typed values, placeholders, duplicates; never prints values |
 | [Get-DiskSpaceReport.ps1](powershell/Get-DiskSpaceReport.ps1) | PowerShell | Free-space report for local or remote Windows servers, pipeline-friendly objects and exit codes |
 | [Invoke-ServiceWatchdog.ps1](powershell/Invoke-ServiceWatchdog.ps1) | PowerShell | Restart stopped Windows services with a stability check, webhook alerts and a circuit breaker that stops chasing crash loops |
